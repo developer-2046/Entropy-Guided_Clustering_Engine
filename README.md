@@ -80,8 +80,6 @@ pip install -r requirements.txt
 
 Then launch Jupyter and run the notebooks in this order:
 1. `01_intro_clustering.ipynb`
-2. `02_entropy_visuals.ipynb`
-3. `03_combined_engine.ipynb`
 
 ---
 
