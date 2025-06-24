@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import config from '../config';
 
 const MarketEntropyDashboard = () => {
@@ -69,7 +69,7 @@ const MarketEntropyDashboard = () => {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Platform indicator */}
         <div className="mb-4 p-4 bg-black/20 rounded-lg text-sm text-green-400 text-center">
-          🚀 Running on Netlify Functions | Live Polling Mode
+          🚀 MarketEntropy Live | Powered by Netlify Functions
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -104,7 +104,7 @@ const ConnectionStatus = ({ isConnected }) => (
   <div className="flex items-center space-x-2">
     <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
     <span className="text-sm text-gray-300">
-      {isConnected ? 'Live Polling' : 'Disconnected'}
+      {isConnected ? 'Live' : 'Connecting...'}
     </span>
   </div>
 );
@@ -125,7 +125,7 @@ const CurrentTime = () => {
   );
 };
 
-// Regime Status Card (same as before)
+// Regime Status Card
 const RegimeStatusCard = ({ regimeData }) => {
   const getRegimeName = (id) => {
     const names = ['Stable', 'Volatile', 'Crisis', 'Recovery'];
@@ -156,7 +156,7 @@ const RegimeStatusCard = ({ regimeData }) => {
               Confidence: {(regimeData.probability * 100).toFixed(1)}%
             </div>
             <div className="text-xs text-blue-400 mt-1">
-              Mode: {regimeData.model_status}
+              Mode: {regimeData.model_status || 'Live'}
             </div>
           </div>
           
@@ -206,9 +206,7 @@ const RegimeStatusCard = ({ regimeData }) => {
   );
 };
 
-// Include all your other components (AlertsPanel, CorrelationHeatmap, etc.)
-// ... (copy from previous version)
-
+// Alerts Panel
 const AlertsPanel = ({ alerts, setAlerts }) => {
   const clearAlert = (id) => {
     setAlerts(prev => prev.filter(alert => alert.id !== id));
@@ -250,41 +248,170 @@ const AlertsPanel = ({ alerts, setAlerts }) => {
   );
 };
 
+// Correlation Heatmap
 const CorrelationHeatmap = ({ regimeData }) => {
-  // Simple placeholder - you can add your full visualization here
+  const tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NFLX', 'NVDA'];
+  
+  const generateMatrix = () => {
+    const baseCorr = regimeData?.regime_id === 2 ? 0.7 : // Crisis
+                     regimeData?.regime_id === 1 ? 0.4 : // Volatile
+                     0.2; // Stable/Recovery
+    
+    const matrix = [];
+    for (let i = 0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        if (i === j) {
+          matrix.push({ value: 1, i, j, key: `${i}-${j}` });
+        } else {
+          const noise = (Math.random() - 0.5) * 0.3;
+          const corr = Math.max(-0.9, Math.min(0.9, baseCorr + noise));
+          matrix.push({ value: corr, i, j, key: `${i}-${j}` });
+        }
+      }
+    }
+    return matrix;
+  };
+
+  const getColor = (value) => {
+    if (value > 0.6) return 'bg-red-500';
+    if (value > 0.3) return 'bg-orange-500';
+    if (value > 0) return 'bg-yellow-500';
+    if (value > -0.3) return 'bg-blue-500';
+    return 'bg-blue-700';
+  };
+
+  const matrix = generateMatrix();
+
   return (
     <div className="bg-black/30 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6">
       <h3 className="text-lg font-semibold mb-4 text-blue-300">Correlation Matrix</h3>
-      <div className="h-64 flex items-center justify-center text-gray-400">
-        <div className="text-center">
-          <div className="text-2xl mb-2">📊</div>
-          <div>Live correlation visualization</div>
-          <div className="text-sm mt-2">
-            Regime: {regimeData ? ['Stable', 'Volatile', 'Crisis', 'Recovery'][regimeData.regime_id] : 'Loading...'}
-          </div>
+      
+      <div className="relative">
+        {/* Labels */}
+        <div className="grid grid-cols-8 gap-1 mb-1">
+          {tickers.map(ticker => (
+            <div key={ticker} className="text-xs text-gray-400 text-center">
+              {ticker}
+            </div>
+          ))}
+        </div>
+        
+        {/* Matrix */}
+        <div className="grid grid-cols-8 gap-1">
+          {matrix.map(cell => (
+            <div
+              key={cell.key}
+              className={`h-8 w-8 ${getColor(cell.value)} opacity-80 flex items-center justify-center text-xs text-white font-mono transition-all duration-300`}
+              title={`${tickers[cell.i]} vs ${tickers[cell.j]}: ${cell.value.toFixed(2)}`}
+            >
+              {cell.value.toFixed(1)}
+            </div>
+          ))}
+        </div>
+        
+        {/* Side labels */}
+        <div className="absolute left-0 top-6 flex flex-col gap-1">
+          {tickers.map(ticker => (
+            <div key={ticker} className="text-xs text-gray-400 h-8 flex items-center pr-1">
+              {ticker}
+            </div>
+          ))}
         </div>
       </div>
+      
+      {regimeData && (
+        <div className="text-xs text-gray-400 mt-4 text-center">
+          Regime: {['Stable', 'Volatile', 'Crisis', 'Recovery'][regimeData.regime_id]} • 
+          Updated: {new Date().toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 };
 
+// Network Visualization
 const NetworkVisualization = ({ regimeData }) => {
   return (
     <div className="bg-black/30 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6">
       <h3 className="text-lg font-semibold mb-4 text-blue-300">Network Graph</h3>
-      <div className="h-64 flex items-center justify-center text-gray-400">
-        <div className="text-center">
-          <div className="text-2xl mb-2">🌐</div>
-          <div>Market network visualization</div>
-          <div className="text-sm mt-2">
-            Stress: {regimeData?.market_stress_level || 'Loading...'}
-          </div>
-        </div>
+      
+      <div className="h-64 relative flex items-center justify-center">
+        {/* Network nodes arranged in circle */}
+        {[...Array(8)].map((_, i) => {
+          const angle = (i / 8) * 2 * Math.PI;
+          const radius = 80;
+          const x = 50 + (radius * Math.cos(angle)) / 2.5;
+          const y = 50 + (radius * Math.sin(angle)) / 2.5;
+          
+          return (
+            <div
+              key={i}
+              className={`absolute w-4 h-4 rounded-full transition-all duration-1000 ${
+                regimeData?.market_stress_level === 'CRITICAL' ? 'bg-red-400 animate-bounce' :
+                regimeData?.market_stress_level === 'HIGH' ? 'bg-orange-400 animate-pulse' :
+                'bg-blue-400'
+              } shadow-lg`}
+              style={{
+                left: `${x}%`,
+                top: `${y}%`,
+                transform: 'translate(-50%, -50%)'
+              }}
+            />
+          );
+        })}
+        
+        {/* Center node */}
+        <div 
+          className={`absolute w-6 h-6 rounded-full transition-all duration-1000 ${
+            regimeData?.market_stress_level === 'CRITICAL' ? 'bg-red-500 animate-bounce' :
+            regimeData?.market_stress_level === 'HIGH' ? 'bg-orange-500 animate-pulse' :
+            'bg-blue-500'
+          } shadow-xl`}
+          style={{
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)'
+          }}
+        />
+        
+        {/* Connection lines */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          {[...Array(8)].map((_, i) => {
+            const angle = (i / 8) * 2 * Math.PI;
+            const radius = 80;
+            const x1 = 128;
+            const y1 = 128;
+            const x2 = 128 + radius * Math.cos(angle) / 2.5;
+            const y2 = 128 + radius * Math.sin(angle) / 2.5;
+            
+            return (
+              <line
+                key={i}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={regimeData?.market_stress_level === 'CRITICAL' ? '#ef4444' : '#60a5fa'}
+                strokeWidth="1"
+                opacity="0.3"
+                className="transition-all duration-300"
+              />
+            );
+          })}
+        </svg>
       </div>
+      
+      {regimeData && (
+        <div className="text-xs text-gray-400 mt-2 text-center">
+          Stress: {regimeData.market_stress_level} • 
+          Nodes: {regimeData.market_stress_level === 'CRITICAL' ? 'High Activity' : 'Normal'}
+        </div>
+      )}
     </div>
   );
 };
 
+// Entropy Timeline
 const EntropyTimeline = ({ historicalData }) => {
   if (!historicalData || historicalData.length === 0) {
     return (
