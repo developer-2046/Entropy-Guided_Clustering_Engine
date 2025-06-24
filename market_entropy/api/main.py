@@ -97,9 +97,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Update market_entropy/api/main.py
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.netlify.app",
+        "https://*.onrender.com"  # Add Render domains
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
