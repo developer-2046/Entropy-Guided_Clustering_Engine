@@ -6,109 +6,41 @@ const MarketEntropyDashboard = () => {
   const [historicalData, setHistoricalData] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [alerts, setAlerts] = useState([]);
-  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   
-  const wsRef = useRef(null);
-
-  // WebSocket connection with production URL
+  // Use polling instead of WebSocket for Netlify
   useEffect(() => {
-    const connectWebSocket = () => {
-      setConnectionStatus('Connecting...');
-      
+    const fetchRegimeData = async () => {
       try {
-        const ws = new WebSocket(`${config.wsUrl}/ws/regime-stream`);
-        
-        ws.onopen = () => {
-          setIsConnected(true);
-          setConnectionStatus('Connected');
-          console.log('🔗 Connected to MarketEntropy stream');
-        };
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            
-            if (data.type === 'regime_update') {
-              setRegimeData(data);
-              setHistoricalData(prev => [...prev.slice(-100), data]);
-              
-              if (data.stress_level === 'HIGH' || data.stress_level === 'CRITICAL') {
-                setAlerts(prev => [...prev, {
-                  id: Date.now(),
-                  message: `🚨 ${data.stress_level} Market Stress Detected`,
-                  entropy: data.entropy_score,
-                  timestamp: new Date().toLocaleTimeString()
-                }]);
-              }
-            }
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-          }
-        };
-        
-        ws.onclose = () => {
-          setIsConnected(false);
-          setConnectionStatus('Disconnected');
-          console.log('🔌 WebSocket disconnected, attempting reconnect...');
-          setTimeout(connectWebSocket, 3000);
-        };
-        
-        ws.onerror = (error) => {
-          setIsConnected(false);
-          setConnectionStatus('Error');
-          console.error('WebSocket error:', error);
-        };
-        
-        wsRef.current = ws;
-      } catch (error) {
-        console.error('Failed to create WebSocket:', error);
-        setConnectionStatus('Failed');
-        setTimeout(connectWebSocket, 5000);
-      }
-    };
-    
-    connectWebSocket();
-    
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
-
-  // Fetch initial data with production URL
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        console.log('🔄 Fetching initial data from:', `${config.apiUrl}/api/v1/regime/current`);
+        // Fetch current regime
         const response = await fetch(`${config.apiUrl}/api/v1/regime/current`);
+        const data = await response.json();
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        setRegimeData(data);
+        setHistoricalData(prev => [...prev.slice(-100), data]);
+        setIsConnected(true);
+        
+        // Add alerts for high stress
+        if (data.stress_level === 'HIGH' || data.stress_level === 'CRITICAL') {
+          setAlerts(prev => [...prev, {
+            id: Date.now(),
+            message: `🚨 ${data.stress_level} Market Stress Detected`,
+            entropy: data.entropy_score,
+            timestamp: new Date().toLocaleTimeString()
+          }]);
         }
         
-        const data = await response.json();
-        console.log('📊 Initial data received:', data);
-        setRegimeData(data);
       } catch (error) {
-        console.error('❌ Failed to fetch initial data:', error);
-        // Set fallback data
-        setRegimeData({
-          regime_id: 1,
-          probability: 0.85,
-          entropy_score: 2.5,
-          market_stress_level: 'MEDIUM',
-          timestamp: new Date().toISOString(),
-          eigenvalues: [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.1, 0.05],
-          model_status: 'fallback'
-        });
+        console.error('Failed to fetch regime data:', error);
+        setIsConnected(false);
       }
     };
     
-    fetchInitialData();
+    // Initial fetch
+    fetchRegimeData();
     
-    // Refresh every 30 seconds as backup
-    const interval = setInterval(fetchInitialData, 30000);
+    // Poll every 5 seconds
+    const interval = setInterval(fetchRegimeData, 5000);
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -126,7 +58,7 @@ const MarketEntropyDashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <ConnectionStatus isConnected={isConnected} status={connectionStatus} />
+              <ConnectionStatus isConnected={isConnected} />
               <CurrentTime />
             </div>
           </div>
@@ -135,16 +67,12 @@ const MarketEntropyDashboard = () => {
 
       {/* Main Dashboard */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Debug Info */}
-        <div className="mb-4 p-4 bg-black/20 rounded-lg text-xs text-gray-400">
-          <div>API: {config.apiUrl}</div>
-          <div>WebSocket: {config.wsUrl}</div>
-          <div>Status: {connectionStatus}</div>
-          <div>Model: {regimeData?.model_status || 'Loading...'}</div>
+        {/* Platform indicator */}
+        <div className="mb-4 p-4 bg-black/20 rounded-lg text-sm text-green-400 text-center">
+          🚀 Running on Netlify Functions | Live Polling Mode
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
           {/* Left Column */}
           <div className="lg:col-span-1 space-y-6">
             <RegimeStatusCard regimeData={regimeData} />
@@ -171,16 +99,12 @@ const MarketEntropyDashboard = () => {
   );
 };
 
-// Enhanced Connection Status Component
-const ConnectionStatus = ({ isConnected, status }) => (
+// Connection Status Component
+const ConnectionStatus = ({ isConnected }) => (
   <div className="flex items-center space-x-2">
-    <div className={`w-3 h-3 rounded-full ${
-      isConnected ? 'bg-green-400 animate-pulse' : 
-      status === 'Connecting...' ? 'bg-yellow-400 animate-ping' :
-      'bg-red-400'
-    }`} />
+    <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
     <span className="text-sm text-gray-300">
-      {isConnected ? 'Live' : status}
+      {isConnected ? 'Live Polling' : 'Disconnected'}
     </span>
   </div>
 );
@@ -201,7 +125,7 @@ const CurrentTime = () => {
   );
 };
 
-// Enhanced Regime Status Card
+// Regime Status Card (same as before)
 const RegimeStatusCard = ({ regimeData }) => {
   const getRegimeName = (id) => {
     const names = ['Stable', 'Volatile', 'Crisis', 'Recovery'];
@@ -231,11 +155,9 @@ const RegimeStatusCard = ({ regimeData }) => {
             <div className="text-sm text-gray-400">
               Confidence: {(regimeData.probability * 100).toFixed(1)}%
             </div>
-            {regimeData.model_status && (
-              <div className="text-xs text-blue-400 mt-1">
-                Mode: {regimeData.model_status}
-              </div>
-            )}
+            <div className="text-xs text-blue-400 mt-1">
+              Mode: {regimeData.model_status}
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -284,7 +206,9 @@ const RegimeStatusCard = ({ regimeData }) => {
   );
 };
 
-// Alerts Panel
+// Include all your other components (AlertsPanel, CorrelationHeatmap, etc.)
+// ... (copy from previous version)
+
 const AlertsPanel = ({ alerts, setAlerts }) => {
   const clearAlert = (id) => {
     setAlerts(prev => prev.filter(alert => alert.id !== id));
@@ -326,170 +250,41 @@ const AlertsPanel = ({ alerts, setAlerts }) => {
   );
 };
 
-// Enhanced Correlation Heatmap
 const CorrelationHeatmap = ({ regimeData }) => {
-  const tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NFLX', 'NVDA'];
-  
-  const generateMatrix = () => {
-    const baseCorr = regimeData?.regime_id === 2 ? 0.7 : // Crisis
-                     regimeData?.regime_id === 1 ? 0.4 : // Volatile
-                     0.2; // Stable/Recovery
-    
-    const matrix = [];
-    for (let i = 0; i < 8; i++) {
-      for (let j = 0; j < 8; j++) {
-        if (i === j) {
-          matrix.push({ value: 1, i, j, key: `${i}-${j}` });
-        } else {
-          const noise = (Math.random() - 0.5) * 0.3;
-          const corr = Math.max(-0.9, Math.min(0.9, baseCorr + noise));
-          matrix.push({ value: corr, i, j, key: `${i}-${j}` });
-        }
-      }
-    }
-    return matrix;
-  };
-
-  const getColor = (value) => {
-    if (value > 0.6) return 'bg-red-500';
-    if (value > 0.3) return 'bg-orange-500';
-    if (value > 0) return 'bg-yellow-500';
-    if (value > -0.3) return 'bg-blue-500';
-    return 'bg-blue-700';
-  };
-
-  const matrix = generateMatrix();
-
+  // Simple placeholder - you can add your full visualization here
   return (
     <div className="bg-black/30 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6">
       <h3 className="text-lg font-semibold mb-4 text-blue-300">Correlation Matrix</h3>
-      
-      <div className="relative">
-        {/* Labels */}
-        <div className="grid grid-cols-8 gap-1 mb-1">
-          {tickers.map(ticker => (
-            <div key={ticker} className="text-xs text-gray-400 text-center">
-              {ticker}
-            </div>
-          ))}
-        </div>
-        
-        {/* Matrix */}
-        <div className="grid grid-cols-8 gap-1">
-          {matrix.map(cell => (
-            <div
-              key={cell.key}
-              className={`h-8 w-8 ${getColor(cell.value)} opacity-80 flex items-center justify-center text-xs text-white font-mono transition-all duration-300`}
-              title={`${tickers[cell.i]} vs ${tickers[cell.j]}: ${cell.value.toFixed(2)}`}
-            >
-              {cell.value.toFixed(1)}
-            </div>
-          ))}
-        </div>
-        
-        {/* Side labels */}
-        <div className="absolute left-0 top-6 flex flex-col gap-1">
-          {tickers.map(ticker => (
-            <div key={ticker} className="text-xs text-gray-400 h-8 flex items-center pr-1">
-              {ticker}
-            </div>
-          ))}
+      <div className="h-64 flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <div className="text-2xl mb-2">📊</div>
+          <div>Live correlation visualization</div>
+          <div className="text-sm mt-2">
+            Regime: {regimeData ? ['Stable', 'Volatile', 'Crisis', 'Recovery'][regimeData.regime_id] : 'Loading...'}
+          </div>
         </div>
       </div>
-      
-      {regimeData && (
-        <div className="text-xs text-gray-400 mt-4 text-center">
-          Regime: {['Stable', 'Volatile', 'Crisis', 'Recovery'][regimeData.regime_id]} • 
-          Updated: {new Date().toLocaleTimeString()}
-        </div>
-      )}
     </div>
   );
 };
 
-// Enhanced Network Visualization
 const NetworkVisualization = ({ regimeData }) => {
   return (
     <div className="bg-black/30 backdrop-blur-sm border border-blue-500/30 rounded-lg p-6">
       <h3 className="text-lg font-semibold mb-4 text-blue-300">Network Graph</h3>
-      
-      <div className="h-64 relative flex items-center justify-center">
-        {/* Network nodes arranged in circle */}
-        {[...Array(8)].map((_, i) => {
-          const angle = (i / 8) * 2 * Math.PI;
-          const radius = 80;
-          const x = 50 + (radius * Math.cos(angle)) / 2.5;
-          const y = 50 + (radius * Math.sin(angle)) / 2.5;
-          
-          return (
-            <div
-              key={i}
-              className={`absolute w-4 h-4 rounded-full transition-all duration-1000 ${
-                regimeData?.market_stress_level === 'CRITICAL' ? 'bg-red-400 animate-bounce' :
-                regimeData?.market_stress_level === 'HIGH' ? 'bg-orange-400 animate-pulse' :
-                'bg-blue-400'
-              } shadow-lg`}
-              style={{
-                left: `${x}%`,
-                top: `${y}%`,
-                transform: 'translate(-50%, -50%)'
-              }}
-            />
-          );
-        })}
-        
-        {/* Center node */}
-        <div 
-          className={`absolute w-6 h-6 rounded-full transition-all duration-1000 ${
-            regimeData?.market_stress_level === 'CRITICAL' ? 'bg-red-500 animate-bounce' :
-            regimeData?.market_stress_level === 'HIGH' ? 'bg-orange-500 animate-pulse' :
-            'bg-blue-500'
-          } shadow-xl`}
-          style={{
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
-          }}
-        />
-        
-        {/* Connection lines */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
-          {[...Array(8)].map((_, i) => {
-            const angle = (i / 8) * 2 * Math.PI;
-            const radius = 80;
-            const x1 = 128;
-            const y1 = 128;
-            const x2 = 128 + radius * Math.cos(angle) / 2.5;
-            const y2 = 128 + radius * Math.sin(angle) / 2.5;
-            
-            return (
-              <line
-                key={i}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={regimeData?.market_stress_level === 'CRITICAL' ? '#ef4444' : '#60a5fa'}
-                strokeWidth="1"
-                opacity="0.3"
-                className="transition-all duration-300"
-              />
-            );
-          })}
-        </svg>
-      </div>
-      
-      {regimeData && (
-        <div className="text-xs text-gray-400 mt-2 text-center">
-          Stress: {regimeData.market_stress_level} • 
-          Nodes: {regimeData.market_stress_level === 'CRITICAL' ? 'High Activity' : 'Normal'}
+      <div className="h-64 flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <div className="text-2xl mb-2">🌐</div>
+          <div>Market network visualization</div>
+          <div className="text-sm mt-2">
+            Stress: {regimeData?.market_stress_level || 'Loading...'}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
 
-// Enhanced Entropy Timeline
 const EntropyTimeline = ({ historicalData }) => {
   if (!historicalData || historicalData.length === 0) {
     return (
