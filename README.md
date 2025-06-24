@@ -1,6 +1,7 @@
 # 🧠 Entropy-Guided Clustering Engine
 
 > Regime detection and deep learning-based interpretability on SP500 closing prices using entropy, network structure, and transformers.
+> Check it out: https://entropy-engine.netlify.app/
 
 ---
 
