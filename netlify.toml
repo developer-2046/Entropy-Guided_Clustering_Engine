@@ -6,7 +6,7 @@
 [build.environment]
   NODE_VERSION = "18"
 
-# Redirect all API calls to functions
+# Redirect API calls to functions
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api"
@@ -27,6 +27,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-[functions]
-  python_version = "3.8"
