@@ -410,14 +410,6 @@ MarketEntropy is for research and educational purposes. Not financial advice. Pa
 
 ---
 
-## 🙏 Acknowledgments
-
-- **University of Utah**: Research support and computational resources
-- **Nvidia**: Recognition and GPU credits for model training
-- **Open Source Community**: Libraries and frameworks that made this possible
-- **Alpha Vantage**: Real-time market data API access
-
----
 
 <div align="center">
 
