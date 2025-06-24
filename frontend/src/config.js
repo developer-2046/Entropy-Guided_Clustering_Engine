@@ -1,6 +1,6 @@
 const config = {
-  apiUrl: '',  // Same origin
-  wsUrl: window.location.origin  // Use polling instead of WebSocket
+  apiUrl: '/.netlify/functions/api',  // Direct function call
+  wsUrl: window.location.origin
 };
 
 export default config;
